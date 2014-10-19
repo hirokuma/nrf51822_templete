@@ -24,39 +24,26 @@
  * OF SUCH DAMAGE.
  */
 
-/** @file
+/**@file    ble_ios.h
  *
- * @defgroup ble_sdk_srv_bas Battery Service
- * @{
- * @ingroup ble_sdk_srv
- * @brief Battery Service module.
- *
- * @details This module implements the Battery Service with the Battery Level characteristic.
- *          During initialization it adds the Battery Service and Battery Level characteristic
- *          to the BLE stack database. Optionally it can also add a Report Reference descriptor
- *          to the Battery Level characteristic (used when including the Battery Service in
- *          the HID service).
- *
- *          If specified, the module will support notification of the Battery Level characteristic
- *          through the ble_ios_battery_level_update() function.
- *          If an event handler is supplied by the application, the Battery Service will
- *          generate Battery Service events to the application.
- *
- * @note The application must propagate BLE stack events to the Battery Service module by calling
- *       ble_ios_on_ble_evt() from the from the @ref ble_stack_handler callback.
- *
- * @note Attention!
- *  To maintain compliance with Nordic Semiconductor ASA Bluetooth profile
- *  qualification listings, this section of source code must not be modified.
+ * I/Oサービス(8bit)
  */
-
 #ifndef BLE_IOS_H__
 #define BLE_IOS_H__
+
+/**************************************************************************/
+/* include                                                                */
+/**************************************************************************/
 
 #include <stdint.h>
 #include <stdbool.h>
 #include "ble.h"
 #include "ble_srv_common.h"
+
+
+/**************************************************************************/
+/* macro                                                                  */
+/**************************************************************************/
 
 //87C9xxxx-CBA0-7D7D-F1B5-E1635787F177
 //                                                                                  xxxxxxxxx
@@ -65,30 +52,26 @@
 #define IOS_UUID_CHAR_INPUT     (0x0002)
 #define IOS_UUID_CHAR_OUTPUT    (0x0003)
 
-/**@brief I/O Service event type. */
-typedef enum {
-    BLE_IOS_EVT_NOTIFICATION_ENABLED,   /**< notification enabled event. */
-    BLE_IOS_EVT_NOTIFICATION_DISABLED   /**< notification disabled event. */
-} ble_ios_evt_type_t;
 
-/**@brief I/O Service event. */
-typedef struct {
-    ble_ios_evt_type_t evt_type;                                /**< Type of event. */
-} ble_ios_evt_t;
+/**************************************************************************/
+/* definition                                                             */
+/**************************************************************************/
 
 // Forward declaration of the ble_ios_t type.
 typedef struct ble_ios_s ble_ios_t;
 
-/**@brief I/O Service event handler type. */
+
+/**@brief サービスイベントハンドラ */
 typedef void (*ble_ios_evt_handler_t) (ble_ios_t *p_ios, uint8_t value);
 
-/**@brief I/O Service init structure. This contains all options and data needed for
- *        initialization of the service.*/
+
+/**@brief サービス初期化構造体 */
 typedef struct {
     ble_ios_evt_handler_t           evt_handler_in;             /**< Event handler to be called for handling events in the I/O Service. */
 } ble_ios_init_t;
 
-/**@brief I/O Service structure. This contains various status information for the service. */
+
+/**@brief サービス構造体 */
 typedef struct ble_ios_s {
     uint16_t                        service_handle;             /**< Handle of I/O Service (as provided by the BLE stack). */
     ble_gatts_char_handles_t        char_handle_in;             /**< Handles related to the Input characteristic. */
@@ -99,34 +82,36 @@ typedef struct ble_ios_s {
     ble_ios_evt_handler_t           evt_handler_in;             /**< Event handler to be called for handling events in the I/O Service. */
 } ble_ios_t;
 
-/**@brief Function for initializing the I/O Service.
+
+/**************************************************************************/
+/* prototype                                                              */
+/**************************************************************************/
+
+/**@brief サービス初期化
  *
- * @param[out]  p_ios       I/O Service structure. This structure will have to be supplied by
- *                          the application. It will be initialized by this function, and will later
- *                          be used to identify this particular service instance.
- * @param[in]   p_ios_init  Information needed to initialize the service.
- *
- * @return      NRF_SUCCESS on successful initialization of service, otherwise an error code.
+ * @param[in]   p_ios       サービス構造体
+ * @param[in]   p_ios_init  サービス初期化構造体
+ * @retval      NRF_SUCCESS 成功
  */
 uint32_t ble_ios_init(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init);
 
-/**@brief Function for handling the Application's BLE Stack events.
+
+/**@brief BLEイベントハンドラ
+ * アプリ層のBLEイベントハンドラから呼び出されることを想定している.
  *
- * @details Handles all events from the BLE stack of interest to the I/O Service.
- *
- * @note For the requirements in the BAS specification to be fulfilled,
- *       ble_ios_battery_level_update() must be called upon reconnection if the
- *       battery level has changed while the service has been disconnected from a bonded
- *       client.
- *
- * @param[in]   p_ios      I/O Service structure.
- * @param[in]   p_ble_evt  Event received from the BLE stack.
+ * @param[in]   p_ios       サービス構造体
+ * @param[in]   p_ble_evt   イベント構造体
  */
 void ble_ios_on_ble_evt(ble_ios_t *p_ios, ble_evt_t *p_ble_evt);
 
 
+/**@brief 8bit値のNotify送信
+ *
+ * @param[in]   p_ios       サービス構造体
+ * @param[in]   value       送信データ
+ * @retval      NRF_SUCCESS 成功
+ */
 uint32_t ble_ios_on_output(ble_ios_t *p_ios, uint8_t value);
 
 #endif // BLE_IOS_H__
 
-/** @} */
