@@ -24,9 +24,9 @@
  * OF SUCH DAMAGE.
  */
 
-/**************************************************************************/
-/* include                                                                */
-/**************************************************************************/
+/**************************************************************************
+ * include
+ **************************************************************************/
 
 #include <stdint.h>
 #include <string.h>
@@ -51,80 +51,206 @@
 #include "ble_ios.h"
 
 
-/**************************************************************************/
-/* macro                                                                  */
-/**************************************************************************/
+/**************************************************************************
+ * macro
+ **************************************************************************/
 
-#define IS_SRVC_CHANGED_CHARACT_PRESENT (0)                                         /**< Include or not the service_changed characteristic. if not enabled, the server's database cannot be changed for the lifetime of the device*/
+/**
+ * Include or not the service_changed characteristic.
+ * if not enabled, the server's database cannot be changed for the lifetime of the device
+ */
+#define IS_SRVC_CHANGED_CHARACT_PRESENT (0)
 
-#define BUTTON_PIN_NO_APP               (19)                                        /**< Button used to wake up the application. */
-
-#define LED_PIN_NO_ADVERTISING          (21)                                        /**< Is on when device is advertising. */
-#define LED_PIN_NO_CONNECTED            (26)                                        /**< Is on when device has connected. */
-#define LED_PIN_NO_ASSERT               (27)                                        /**< Is on when application has asserted. */
-#define LED_PIN_NO_APP                  (16)
-
-#define DEVICE_NAME                     "hiro99ma_Template"                         /**< Name of device. Will be included in the advertising data. */
-
-#define APP_ADV_INTERVAL                (64)                                        /**< The advertising interval (in units of 0.625 ms. This value corresponds to 40 ms). */
-#define APP_ADV_TIMEOUT_IN_SECONDS      (180)                                       /**< The advertising timeout (in units of seconds). */
-
-#define APP_TIMER_PRESCALER             (0)                                         /**< Value of the RTC1 PRESCALER register. */
-#define APP_TIMER_MAX_TIMERS            (2)                                         /**< Maximum number of simultaneously created timers. */
-#define APP_TIMER_OP_QUEUE_SIZE         (4)                                         /**< Size of timer operation queues. */
-
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(500, UNIT_1_25_MS)            /**< Minimum acceptable connection interval (0.5 seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(1000, UNIT_1_25_MS)           /**< Maximum acceptable connection interval (1 second). */
-#define SLAVE_LATENCY                   (0)                                         /**< Slave latency. */
-#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)             /**< Connection supervisory timeout (4 seconds). */
-#define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000, APP_TIMER_PRESCALER)  /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
-#define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000, APP_TIMER_PRESCALER) /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
-#define MAX_CONN_PARAMS_UPDATE_COUNT    (3)                                         /**< Number of attempts before giving up the connection parameter negotiation. */
-
-#define APP_GPIOTE_MAX_USERS            (1)                                         /**< Maximum number of users of the GPIOTE handler. */
-
-#define BUTTON_DETECTION_DELAY          APP_TIMER_TICKS(50, APP_TIMER_PRESCALER)    /**< Delay from a GPIOTE event until a button is reported as pushed (in number of timer ticks). */
-
-#define SEC_PARAM_TIMEOUT               (30)                                        /**< Timeout for Pairing Request or Security Request (in seconds). */
-#define SEC_PARAM_BOND                  (1)                                         /**< Perform bonding. */
-#define SEC_PARAM_MITM                  (0)                                         /**< Man In The Middle protection not required. */
-#define SEC_PARAM_IO_CAPABILITIES       BLE_GAP_IO_CAPS_NONE                        /**< No I/O capabilities. */
-#define SEC_PARAM_OOB                   (0)                                         /**< Out Of Band data not available. */
-#define SEC_PARAM_MIN_KEY_SIZE          (7)                                         /**< Minimum encryption key size. */
-#define SEC_PARAM_MAX_KEY_SIZE          (16)                                        /**< Maximum encryption key size. */
-
-#define DEAD_BEEF                       (0xDEADBEEF)                                /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
-
-#define SCHED_MAX_EVENT_DATA_SIZE       sizeof(app_timer_event_t)                   /**< Maximum size of scheduler events. Note that scheduler BLE stack events do not contain any data, as the events are being pulled from the stack in the event handler. */
-#define SCHED_QUEUE_SIZE                (10)                                        /**< Maximum number of events in the scheduler queue. */
+/** Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
+#define DEAD_BEEF                       (0xDEADBEEF)
 
 #define ARRAY_SIZE(array)               (sizeof(array) / sizeof(array[0]))
 
+/*
+ * ピン番号
+ */
+/** Button : アプリ用 */
+#define BUTTON_PIN_NO_APP               (19)
 
-/**************************************************************************/
-/* declaration                                                            */
-/**************************************************************************/
+/** LED : Advertising中 */
+#define LED_PIN_NO_ADVERTISING          (21)
 
-static ble_gap_sec_params_t             m_sec_params;                               /**< Security requirements for this application. */
-static uint16_t                         m_conn_handle = BLE_CONN_HANDLE_INVALID;    /**< Handle of the current connection. */
+/** LED : Connect中 */
+#define LED_PIN_NO_CONNECTED            (26)
+
+/** LED : Assert発生 */
+#define LED_PIN_NO_ASSERT               (27)
+
+/** LED : アプリ用 */
+#define LED_PIN_NO_APP                  (16)
+
+/*
+ * Timer
+ */
+/** Value of the RTC1 PRESCALER register. */
+#define APP_TIMER_PRESCALER             (0)
+
+/** Maximum number of simultaneously created timers. */
+#define APP_TIMER_MAX_TIMERS            (2)
+
+/** Size of timer operation queues. */
+#define APP_TIMER_OP_QUEUE_SIZE         (4)
+
+/*
+ * GPIOTEおよびButton
+ */
+/** Maximum number of users of the GPIOTE handler. */
+#define APP_GPIOTE_MAX_USERS            (1)
+
+/** Delay from a GPIOTE event until a button is reported as pushed (in number of timer ticks). */
+#define BUTTON_DETECTION_DELAY          APP_TIMER_TICKS(50, APP_TIMER_PRESCALER)
+
+/*
+ * Scheduler
+ */
+
+/**
+ * Maximum size of scheduler events.
+ * Note that scheduler BLE stack events do not contain any data, as the events are being pulled from the stack in the event handler.
+ */
+#define SCHED_MAX_EVENT_DATA_SIZE       sizeof(app_timer_event_t)
+
+/** Maximum number of events in the scheduler queue. */
+#define SCHED_QUEUE_SIZE                (10)
+
+
+/*
+ * デバイス名
+ *   UTF-8かつ、\0を含まずに20文字以内(20byte?)
+ */
+#define GAP_DEVICE_NAME                 "hiro99ma_Template"
+
+/*
+ * Appearance設定
+ *  コメントアウト時はAppearance無しにするが、おそらくSoftDeviceがUnknownにしてくれる。
+ *
+ * Bluetooth Core Specification Supplement, Part A, Section 1.12
+ * Bluetooth Core Specification 4.0 (Vol. 3), Part C, Section 12.2
+ * https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.appearance.xml
+ * https://devzone.nordicsemi.com/documentation/nrf51/4.3.0/html/group___b_l_e___a_p_p_e_a_r_a_n_c_e_s.html
+ */
+//#define GAP_USE_APPEARANCE              BLE_APPEARANCE_UNKNOWN
+
+
+/*
+ * BLE : Advertising
+ */
+/* Advertising間隔[0.625msec単位] */
+#define APP_ADV_INTERVAL                (64)
+
+/* Advertisingタイムアウト時間[sec単位] */
+#define APP_ADV_TIMEOUT_IN_SECONDS      (180)
+
+/*
+ * Peripheral Preferred Connection Parameters(PPCP)
+ *   パラメータの意味はCore_v4.1 p.2537 "4.5 CONNECTION STATE"を参照
+ *
+ * connInterval : Connectionイベントの送信間隔(7.5msec～4sec)
+ * connSlaveLatency : SlaveがConnectionイベントを連続して無視できる回数
+ * connSupervisionTimeout :
+ */
+/* 最小時間[msec単位] */
+#define CONN_MIN_INTERVAL               MSEC_TO_UNITS(500, UNIT_1_25_MS)
+
+/* 最大時間[msec単位] */
+#define CONN_MAX_INTERVAL               MSEC_TO_UNITS(1000, UNIT_1_25_MS)
+
+/* slave latency */
+#define CONN_SLAVE_LATENCY              (0)
+
+/* connSupervisionTimeout[msec単位] */
+#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)
+
+/** sd_ble_gap_conn_param_update()を実行してから初回の接続イベントを通知するまでの時間[msec単位] */
+/*
+ * sd_ble_gap_conn_param_update()
+ *   Central role時:
+ *      Link Layer接続パラメータ更新手続きを初期化する。
+ *
+ *   Peripheral role時:
+ *      L2CAPへ連絡要求(corresponding L2CAP request)を送信し、Centralからの手続きを待つ。
+ *      接続パラメータとしてNULLが指定でき、そのときはPPCPキャラクタリスティックが使われる。
+ *      ということは、Peripheralだったらsd_ble_gap_conn_param_update()は呼ばずに
+ *      sd_ble_gap_ppcp_set()を呼ぶということでもよいということか？
+ *
+ * note:
+ *      connSupervisionTimeout * 8 >= connIntervalMax * (connSlaveLatency + 1)
+ */
+#define CONN_FIRST_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000, APP_TIMER_PRESCALER)
+
+/** sd_ble_gap_conn_param_update()を呼び出す間隔[msec単位] */
+#define CONN_NEXT_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000, APP_TIMER_PRESCALER)
+
+/** Number of attempts before giving up the connection parameter negotiation. */
+#define CONN_MAX_PARAMS_UPDATE_COUNT    (3)
+
+/*
+ * BLE : Security
+ */
+/** ペアリング要求からのタイムアウト時間[sec] */
+#define SEC_PARAM_TIMEOUT               (30)
+
+/** 1:Bondingあり 0:なし */
+#define SEC_PARAM_BOND                  (1)
+
+/** 1:ペアリング時の認証あり 0:なし */
+#define SEC_PARAM_MITM                  (0)
+
+/** IO能力
+ * - BLE_GAP_IO_CAPS_DISPLAY_ONLY     : input=無し/output=画面
+ * - BLE_GAP_IO_CAPS_DISPLAY_YESNO    : input=Yes/No程度/output=画面
+ * - BLE_GAP_IO_CAPS_KEYBOARD_ONLY    : input=キーボード/output=無し
+ * - BLE_GAP_IO_CAPS_NONE             : input/outputなし。あるいはMITM無し
+ * - BLE_GAP_IO_CAPS_KEYBOARD_DISPLAY : input=キーボード/output=画面
+ */
+#define SEC_PARAM_IO_CAPABILITIES       BLE_GAP_IO_CAPS_NONE
+
+/** 1:OOB認証有り/0:なし */
+#define SEC_PARAM_OOB                   (0)
+
+/** 符号化鍵サイズ:最小byte(7～) */
+#define SEC_PARAM_MIN_KEY_SIZE          (7)
+
+/** 符号化鍵サイズ:最大byte(min～16) */
+#define SEC_PARAM_MAX_KEY_SIZE          (16)
+
+
+
+/**************************************************************************
+ * declaration
+ **************************************************************************/
+
+/** Handle of the current connection. */
+static uint16_t                         m_conn_handle = BLE_CONN_HANDLE_INVALID;
 static ble_ios_t                        m_ios;
 
 
-/**************************************************************************/
-/* prototype                                                              */
-/**************************************************************************/
+/**************************************************************************
+ * prototype
+ **************************************************************************/
 
 static void sys_evt_dispatch(uint32_t sys_evt);
 
-static void leds_init(void);
+/* GPIO */
+static void gpio_init(void);
+
+/* LED */
 __attribute__( ( always_inline ) ) __STATIC_INLINE void led_on(int pin);
 __attribute__( ( always_inline ) ) __STATIC_INLINE void led_off(int pin);
 
+/* Timer */
 static void timers_init(void);
 static void timers_start(void);
 
+/* Scheduler */
 static void scheduler_init(void);
 
+/* GPIOTEおよびButton */
 static void gpiote_init(void);
 static void buttons_init(void);
 static void button_event_handler(uint8_t pin_no, uint8_t button_event);
@@ -148,31 +274,29 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt);
 static void ble_stack_init(void);
 
 
-/**************************************************************************/
-/* main entry                                                             */
-/**************************************************************************/
+/**************************************************************************
+ * main entry
+ **************************************************************************/
 
 /**@brief main
  */
 int main(void)
 {
     // 初期化
-    leds_init();
-    timers_init();
+    gpio_init();
+    timers_init();		//buttons_init()やble_stack_init()よりも前に呼ぶこと!
 
     gpiote_init();
     buttons_init();
-    ble_stack_init();
     scheduler_init();
-    gap_params_init();
-    services_init();
-    advertising_init();
-    conn_params_init();
-    sec_params_init();
+
+    ble_stack_init();
 
     // 処理開始
     //timers_start();
     advertising_start();
+
+    // メインループ
     while (1) {
         //スケジュール済みイベントの実行(mainloop内で呼び出す)
         app_sched_execute();
@@ -182,9 +306,9 @@ int main(void)
 }
 
 
-/**************************************************************************/
-/* public function                                                        */
-/**************************************************************************/
+/**************************************************************************
+ * public function
+ **************************************************************************/
 
 /**@brief エラーハンドラ
  *
@@ -230,9 +354,9 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 }
 
 
-/**************************************************************************/
-/* private function                                                       */
-/**************************************************************************/
+/**************************************************************************
+ * private function
+ **************************************************************************/
 
 /**@brief システムイベント発生
  *
@@ -258,21 +382,21 @@ static void sys_evt_dispatch(uint32_t sys_evt)
 }
 
 
-/**********************************************/
-/* LED                                        */
-/**********************************************/
+/**********************************************
+ * GPIO
+ **********************************************/
 
-/**@brief LED初期化
- *
- * 全部消灯させる。
+/**
+ * @brief GPIO初期化
  */
-static void leds_init(void)
+static void gpio_init(void)
 {
     nrf_gpio_cfg_output(LED_PIN_NO_ADVERTISING);
     nrf_gpio_cfg_output(LED_PIN_NO_CONNECTED);
     nrf_gpio_cfg_output(LED_PIN_NO_ASSERT);
     nrf_gpio_cfg_output(LED_PIN_NO_APP);
 
+    /* LED消灯 */
     led_off(LED_PIN_NO_ADVERTISING);
     led_off(LED_PIN_NO_CONNECTED);
     led_off(LED_PIN_NO_ASSERT);
@@ -280,7 +404,12 @@ static void leds_init(void)
 }
 
 
-/**@brief LED点灯
+/**********************************************
+ * LED
+ **********************************************/
+
+/**
+ * @brief LED点灯
  *
  * @param[in]   pin     対象PIN番号
  */
@@ -291,7 +420,8 @@ __attribute__( ( always_inline ) ) __STATIC_INLINE void led_on(int pin)
 }
 
 
-/**@brief LED消灯
+/**
+ * @brief LED消灯
  *
  * @param[in]   pin     対象PIN番号
  */
@@ -302,11 +432,12 @@ __attribute__( ( always_inline ) ) __STATIC_INLINE void led_off(int pin)
 }
 
 
-/**********************************************/
-/* タイマ                                     */
-/**********************************************/
+/**********************************************
+ * タイマ
+ **********************************************/
 
-/**@brief タイマ初期化
+/**
+ * @brief タイマ初期化
  *
  * タイマ機能を初期化する。
  * 調べた範囲では、以下の機能を使用する場合には、その初期化よりも前に実行しておく必要がある。
@@ -330,8 +461,9 @@ static void timers_init(void)
 }
 
 
-/**@brief タイマ開始
-*/
+/**
+ * @brief タイマ開始
+ */
 static void timers_start(void)
 {
 #if 0
@@ -344,11 +476,12 @@ static void timers_start(void)
 }
 
 
-/**********************************************/
-/* Scheduler                                  */
-/**********************************************/
+/**********************************************
+ * Scheduler
+ **********************************************/
 
-/**@brief スケジューラ初期化
+/**
+ * @brief スケジューラ初期化
  */
 static void scheduler_init(void)
 {
@@ -356,11 +489,12 @@ static void scheduler_init(void)
 }
 
 
-/**********************************************/
-/* GPIOTE & Button                            */
-/**********************************************/
+/**********************************************
+ * GPIOTE
+ **********************************************/
 
-/**@brief GPIOTE初期化
+/**
+ * @brief GPIOTE初期化
  */
 static void gpiote_init(void)
 {
@@ -368,7 +502,12 @@ static void gpiote_init(void)
 }
 
 
-/**@brief ボタン初期化
+/**********************************************
+ * Button
+ **********************************************/
+
+/**
+ * @brief ボタン初期化
  *
  * @note    初期化しただけではボタンを使用できない。
  *          使用する場合はapp_button_enable()を呼び出すこと。
@@ -384,7 +523,8 @@ static void buttons_init(void)
 }
 
 
-/**@brief ボタンイベントハンドラ
+/**
+ * @brief ボタンイベントハンドラ
  *
  * @param[in]   pin_no         イベントが発生したピン番号
  * @param[in]   button_event   APP_BUTTON_PUSH or APP_BUTTON_RELEASE.
@@ -424,96 +564,12 @@ static void button_event_handler(uint8_t pin_no, uint8_t button_event)
 }
 
 
-/**********************************************/
-/* BLE : GAP                                  */
-/**********************************************/
+/**********************************************
+ * BLE : Advertising
+ **********************************************/
 
-/**@brief GAP初期化
- *
- *  - デバイス名設定(必須)
- *  - Appearance設定(optional:設定無し)
- *  - PPCP設定(optional:設定有り)
- */
-static void gap_params_init(void)
-{
-    uint32_t                err_code;
-    ble_gap_conn_params_t   gap_conn_params;
-    ble_gap_conn_sec_mode_t sec_mode;
-
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
-
-    /* デバイス名設定 */
-    err_code = sd_ble_gap_device_name_set(&sec_mode,
-                                          (const uint8_t *)DEVICE_NAME,
-                                          strlen(DEVICE_NAME));
-    APP_ERROR_CHECK(err_code);
-
-#if 0
-    /* YOUR_JOB: Use an appearance value matching the application's use case. */
-    err_code = sd_ble_gap_appearance_set(BLE_APPEARANCE_);
-    APP_ERROR_CHECK(err_code);
-#endif
-
-    /*
-     * Peripheral Preferred Connection Parameters(PPCP)
-     * ここで設定しておくと、Connection Parameter Update Reqを送信せずに済むらしい。
-     *
-     * パラメータの意味はCore_v4.1 p.2537 "4.5 CONNECTION STATE"を参照
-     *  connInterval : Connectionイベントの送信間隔(7.5msec～4sec)
-     *  connSlaveLatency : SlaveがConnectionイベントを連続して無視できる回数
-     *  connSupervisionTimeout :
-     */
-    memset(&gap_conn_params, 0, sizeof(gap_conn_params));
-
-    gap_conn_params.min_conn_interval = MIN_CONN_INTERVAL;
-    gap_conn_params.max_conn_interval = MAX_CONN_INTERVAL;
-    gap_conn_params.slave_latency     = SLAVE_LATENCY;
-    gap_conn_params.conn_sup_timeout  = CONN_SUP_TIMEOUT;
-
-    err_code = sd_ble_gap_ppcp_set(&gap_conn_params);
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**********************************************/
-/* BLE : Advertising                          */
-/**********************************************/
-
-/**@brief Advertising初期化
- *
- * @details Encodes the required advertising data and passes it to the stack.
- *          Also builds a structure to be passed to the stack when starting advertising.
- */
-static void advertising_init(void)
-{
-    uint32_t      err_code;
-    ble_advdata_t advdata;
-    ble_advdata_t scanrsp;
-    uint8_t       flags = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
-
-    // サービスのUUID設定
-    ble_uuid_t adv_uuids[] = {
-        { IOS_UUID_SERVICE, m_ios.uuid_type }
-    };
-
-    // Build and set advertising data
-    memset(&advdata, 0, sizeof(advdata));
-
-    advdata.name_type               = BLE_ADVDATA_FULL_NAME;
-    advdata.include_appearance      = true;
-    advdata.flags.size              = sizeof(flags);
-    advdata.flags.p_data            = &flags;
-
-    memset(&scanrsp, 0, sizeof(scanrsp));
-    scanrsp.uuids_complete.uuid_cnt = ARRAY_SIZE(adv_uuids);
-    scanrsp.uuids_complete.p_uuids  = adv_uuids;
-
-    err_code = ble_advdata_set(&advdata, &scanrsp);
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for starting advertising.
+/**
+ * @brief Advertising開始
  */
 static void advertising_start(void)
 {
@@ -535,22 +591,16 @@ static void advertising_start(void)
 }
 
 
-/**********************************************/
-/* BLE : Services                             */
-/**********************************************/
+/**********************************************
+ * BLE : Services
+ **********************************************/
 
-/**@brief Function for initializing services that will be used by the application.
+/**
+ * @brief I/Oサービスイベントハンドラ
+ *
+ * @param[in]   p_ios   I/Oサービス構造体
+ * @param[in]   value   受信した値
  */
-static void services_init(void)
-{
-    ble_ios_init_t ios_init;
-    ios_init.evt_handler_in = services_ios_handler_in;
-    uint32_t err_code = ble_ios_init(&m_ios, &ios_init);
-    APP_ERROR_CHECK(err_code);
-}
-
-
-//void (*ble_ios_evt_handler_t) (ble_ios_t *p_ios, uint8_t value)
 static void services_ios_handler_in(ble_ios_t *p_ios, uint8_t value)
 {
     if (value == 0x80) {
@@ -564,62 +614,21 @@ static void services_ios_handler_in(ble_ios_t *p_ios, uint8_t value)
 }
 
 
-/**********************************************/
-/* BLE : Security                             */
-/**********************************************/
+/**********************************************
+ * BLE : Connection
+ **********************************************/
 
-/**@brief Function for initializing security parameters.
- */
-static void sec_params_init(void)
-{
-    m_sec_params.timeout      = SEC_PARAM_TIMEOUT;
-    m_sec_params.bond         = SEC_PARAM_BOND;
-    m_sec_params.mitm         = SEC_PARAM_MITM;
-    m_sec_params.io_caps      = SEC_PARAM_IO_CAPABILITIES;
-    m_sec_params.oob          = SEC_PARAM_OOB;
-    m_sec_params.min_key_size = SEC_PARAM_MIN_KEY_SIZE;
-    m_sec_params.max_key_size = SEC_PARAM_MAX_KEY_SIZE;
-}
-
-
-/**********************************************/
-/* BLE : Connect                              */
-/**********************************************/
-
-/**@brief Function for initializing the Connection Parameters module.
- */
-static void conn_params_init(void)
-{
-    uint32_t               err_code;
-    ble_conn_params_init_t cp_init;
-
-    memset(&cp_init, 0, sizeof(cp_init));
-
-    cp_init.p_conn_params                  = NULL;
-    cp_init.first_conn_params_update_delay = FIRST_CONN_PARAMS_UPDATE_DELAY;
-    cp_init.next_conn_params_update_delay  = NEXT_CONN_PARAMS_UPDATE_DELAY;
-    cp_init.max_conn_params_update_count   = MAX_CONN_PARAMS_UPDATE_COUNT;
-    cp_init.start_on_notify_cccd_handle    = BLE_GATT_HANDLE_INVALID;
-    cp_init.disconnect_on_fail             = false;
-    cp_init.evt_handler                    = conn_params_evt_handler;
-    cp_init.error_handler                  = conn_params_error_handler;
-
-    err_code = ble_conn_params_init(&cp_init);
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for handling the Connection Parameters Module.
+/**
+ * @brief Connectionパラメータモジュールイベントハンドラ
  *
- * @details This function will be called for all events in the Connection Parameters Module which
- *          are passed to the application.
+ * @details Connectionパラメータモジュールでアプリに通知するイベントが発生した場合に呼ばれる。
  *          @note All this function does is to disconnect. This could have been done by simply
  *                setting the disconnect_on_fail config parameter, but instead we use the event
  *                handler mechanism to demonstrate its use.
  *
- * @param[in]   p_evt   Event received from the Connection Parameters Module.
+ * @param[in]   p_evt   Connectionパラメータモジュールから受信したイベント
  */
-static void conn_params_evt_handler(ble_conn_params_evt_t * p_evt)
+static void conn_params_evt_handler(ble_conn_params_evt_t *p_evt)
 {
     uint32_t err_code;
 
@@ -630,9 +639,10 @@ static void conn_params_evt_handler(ble_conn_params_evt_t * p_evt)
 }
 
 
-/**@brief Function for handling a Connection Parameters error.
+/**
+ * @brief Connectionパラメータエラーハンドラ
  *
- * @param[in]   nrf_error   Error code containing information about what went wrong.
+ * @param[in]   nrf_error   エラーコード
  */
 static void conn_params_error_handler(uint32_t nrf_error)
 {
@@ -640,79 +650,119 @@ static void conn_params_error_handler(uint32_t nrf_error)
 }
 
 
-/**********************************************/
-/* BLE                                        */
-/**********************************************/
+/**********************************************
+ * BLE stack
+ **********************************************/
 
-/**@brief Function for handling the Application's BLE Stack events.
+/**
+ * @brief BLEスタックイベントハンドラ
  *
- * @param[in]   p_ble_evt   Bluetooth stack event.
+ * @param[in]   p_ble_evt   BLEスタックイベント
  */
-static void ble_evt_handler(ble_evt_t * p_ble_evt)
+static void ble_evt_handler(ble_evt_t *p_ble_evt)
 {
     uint32_t                         err_code;
     static ble_gap_evt_auth_status_t m_auth_status;
     ble_gap_enc_info_t *             p_enc_info;
 
     switch (p_ble_evt->header.evt_id) {
+    /*************
+     * GAP event
+     *************/
+
+    //接続が成立したとき
     case BLE_GAP_EVT_CONNECTED:
         led_on(LED_PIN_NO_CONNECTED);
         led_off(LED_PIN_NO_ADVERTISING);
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
 
-        //接続されている間だけボタンは使用できる
+        //ボタンの使用を許可する
         err_code = app_button_enable();
         APP_ERROR_CHECK(err_code);
         break;
 
+    //相手から切断されたとき
+    //必要があればsd_ble_gatts_sys_attr_get()でSystem Attributeを取得し、保持しておく。
+    //保持したSystem Attributeは、EVT_SYS_ATTR_MISSINGで返すことになる。
     case BLE_GAP_EVT_DISCONNECTED:
         led_off(LED_PIN_NO_CONNECTED);
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
 
-        //接続されている間だけボタンは使用できる
+        //ボタンの使用を禁止する
         err_code = app_button_disable();
         APP_ERROR_CHECK(err_code);
 
         advertising_start();
         break;
 
+    //SMP Paring要求を受信したとき
+    //sd_ble_gap_sec_params_reply()で値を返したあと、SMP Paring Phase 2に状態遷移する
     case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
-        err_code = sd_ble_gap_sec_params_reply(m_conn_handle,
+        {
+            ble_gap_sec_params_t sec_param;
+            sec_param.timeout      = SEC_PARAM_TIMEOUT;
+            sec_param.bond         = SEC_PARAM_BOND;
+            sec_param.mitm         = SEC_PARAM_MITM;
+            sec_param.io_caps      = SEC_PARAM_IO_CAPABILITIES;
+            sec_param.oob          = SEC_PARAM_OOB;
+            sec_param.min_key_size = SEC_PARAM_MIN_KEY_SIZE;
+            sec_param.max_key_size = SEC_PARAM_MAX_KEY_SIZE;
+            err_code = sd_ble_gap_sec_params_reply(m_conn_handle,
                                                BLE_GAP_SEC_STATUS_SUCCESS,
-                                               &m_sec_params);
-        APP_ERROR_CHECK(err_code);
+                                               &sec_param);
+            APP_ERROR_CHECK(err_code);
+        }
         break;
 
-    case BLE_GATTS_EVT_SYS_ATTR_MISSING:
-        err_code = sd_ble_gatts_sys_attr_set(m_conn_handle, NULL, 0);
-        APP_ERROR_CHECK(err_code);
-        break;
-
+    //Just Works(Bonding有り)の場合、SMP Paring Phase 3のあとでPeripheral Keyが渡される。
+    //ここではPeripheral Keyを保存だけしておき、次のBLE_GAP_EVT_SEC_INFO_REQUESTで処理する。
     case BLE_GAP_EVT_AUTH_STATUS:
         m_auth_status = p_ble_evt->evt.gap_evt.params.auth_status;
         break;
 
+    //SMP Paringが終わったとき？
     case BLE_GAP_EVT_SEC_INFO_REQUEST:
         p_enc_info = &m_auth_status.periph_keys.enc_info;
         if (p_enc_info->div == p_ble_evt->evt.gap_evt.params.sec_info_request.div) {
+            //Peripheral Keyが有る
             err_code = sd_ble_gap_sec_info_reply(m_conn_handle, p_enc_info, NULL);
-            APP_ERROR_CHECK(err_code);
         }
         else {
-            // No keys found for this device
+            //Peripheral Keyが無い
             err_code = sd_ble_gap_sec_info_reply(m_conn_handle, NULL, NULL);
+        }
+        APP_ERROR_CHECK(err_code);
+        break;
+
+    //Advertisingか認証のタイムアウト発生
+    case BLE_GAP_EVT_TIMEOUT:
+        switch (p_ble_evt->evt.gap_evt.params.timeout.src) {
+        case BLE_GAP_TIMEOUT_SRC_ADVERTISEMENT: //Advertisingのタイムアウト
+            /* Advertising LEDを消灯 */
+            led_off(LED_PIN_NO_ADVERTISING);
+
+            /* System-OFFにする(もう戻ってこない) */
+            err_code = sd_power_system_off();
             APP_ERROR_CHECK(err_code);
+            break;
+
+        case BLE_GAP_TIMEOUT_SRC_SECURITY_REQUEST:  //Security requestのタイムアウト
+            break;
+
+        default:
+            break;
         }
         break;
 
-    case BLE_GAP_EVT_TIMEOUT:
-        if (p_ble_evt->evt.gap_evt.params.timeout.src == BLE_GAP_TIMEOUT_SRC_ADVERTISEMENT) {
-            led_off(LED_PIN_NO_ADVERTISING);
+    /*********************
+     * GATT Server event
+     *********************/
 
-            // Go to system-off mode (this function will not return; wakeup will cause a reset)
-            err_code = sd_power_system_off();
-            APP_ERROR_CHECK(err_code);
-        }
+    //接続後、Bondingした相手からSystem Attribute要求を受信したとき
+    //System Attributeは、EVT_DISCONNECTEDで保持するが、今回は保持しないのでNULLを返す。
+    case BLE_GATTS_EVT_SYS_ATTR_MISSING:
+        err_code = sd_ble_gatts_sys_attr_set(m_conn_handle, NULL, 0);
+        APP_ERROR_CHECK(err_code);
         break;
 
     default:
@@ -722,14 +772,14 @@ static void ble_evt_handler(ble_evt_t * p_ble_evt)
 }
 
 
-/**@brief Function for dispatching a BLE stack event to all modules with a BLE stack event handler.
+/**
+ * @brief BLEイベントハンドラ
  *
- * @details This function is called from the scheduler in the main loop after a BLE stack
- *          event has been received.
+ * @details BLEスタックイベント受信後、メインループのスケジューラから呼ばれる。
  *
- * @param[in]   p_ble_evt   Bluetooth stack event.
+ * @param[in]   p_ble_evt   BLEスタックイベント
  */
-static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
+static void ble_evt_dispatch(ble_evt_t *p_ble_evt)
 {
     ble_evt_handler(p_ble_evt);
     ble_conn_params_on_ble_evt(p_ble_evt);
@@ -739,30 +789,156 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
 }
 
 
-/**@brief BLEスタック初期化
+/**
+ * @brief BLEスタック初期化
  *
- * @details Initializes the SoftDevice and the BLE event interrupt.
+ * @detail BLE関連の初期化を行う。
+ *      -# SoftDeviceハンドラ初期化
+ *      -# システムイベントハンドラ初期化
+ *      -# BLEスタック有効化
+ *      -# BLEイベントハンドラ設定
+ *      -# デバイス名設定
+ *      -# Appearance設定(GAP_USE_APPEARANCE定義時)
+ *      -# PPCP設定
+ *      -# Service初期化
+ *      -# Advertising初期化
+ *      -# Connection初期化
  */
 static void ble_stack_init(void)
 {
     uint32_t err_code;
 
-    // Initialize the SoftDevice handler module.
+    /*
+     * SoftDeviceの初期化
+     * スケジューラ使用はよいとして、HANDLERは何を指しているのか？
+     */
     SOFTDEVICE_HANDLER_INIT(NRF_CLOCK_LFCLKSRC_RC_250_PPM_4000MS_CALIBRATION, true);
 
-    // Register with the SoftDevice handler module for System events.
+    /* システムイベントハンドラの設定 */
     err_code = softdevice_sys_evt_handler_set(sys_evt_dispatch);
     APP_ERROR_CHECK(err_code);
 
-    // Enable BLE stack
-    ble_enable_params_t ble_enable_params;
-    memset(&ble_enable_params, 0, sizeof(ble_enable_params));
-    ble_enable_params.gatts_enable_params.service_changed = IS_SRVC_CHANGED_CHARACT_PRESENT;
-    err_code = sd_ble_enable(&ble_enable_params);
-    APP_ERROR_CHECK(err_code);
+    /* BLEスタックの有効化 */
+    {
+        ble_enable_params_t ble_enable_params;
 
-    // Register with the SoftDevice handler module for BLE events.
+        memset(&ble_enable_params, 0, sizeof(ble_enable_params));
+        ble_enable_params.gatts_enable_params.service_changed = IS_SRVC_CHANGED_CHARACT_PRESENT;
+        err_code = sd_ble_enable(&ble_enable_params);
+        APP_ERROR_CHECK(err_code);
+    }
+
+    /* BLEイベントハンドラの設定 */
     err_code = softdevice_ble_evt_handler_set(ble_evt_dispatch);
     APP_ERROR_CHECK(err_code);
+
+    /* デバイス名設定 */
+    {
+        //デバイス名へのWrite Permission(no protection, open link)
+        ble_gap_conn_sec_mode_t sec_mode;
+
+        BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
+        err_code = sd_ble_gap_device_name_set(&sec_mode,
+                                            (const uint8_t *)GAP_DEVICE_NAME,
+                                            strlen(GAP_DEVICE_NAME));
+        APP_ERROR_CHECK(err_code);
+    }
+
+#ifdef GAP_USE_APPEARANCE
+    /* Appearance設定 */
+    err_code = sd_ble_gap_appearance_set(GAP_USE_APPEARANCE);
+    APP_ERROR_CHECK(err_code);
+#endif  //GAP_USE_APPEARANCE
+
+    /*
+     * Peripheral Preferred Connection Parameters(PPCP)
+     * ここで設定しておくと、Connection Parameter Update Reqを送信せずに済むらしい。
+     */
+    {
+        ble_gap_conn_params_t   gap_conn_params = {0};
+
+        gap_conn_params.min_conn_interval = CONN_MIN_INTERVAL;
+        gap_conn_params.max_conn_interval = CONN_MAX_INTERVAL;
+        gap_conn_params.slave_latency     = CONN_SLAVE_LATENCY;
+        gap_conn_params.conn_sup_timeout  = CONN_SUP_TIMEOUT;
+
+        err_code = sd_ble_gap_ppcp_set(&gap_conn_params);
+        APP_ERROR_CHECK(err_code);
+    }
+
+    /////////////////////////////
+    // Service初期化
+    {
+        ble_ios_init_t ios_init;
+
+        ios_init.evt_handler_in = services_ios_handler_in;
+        err_code = ble_ios_init(&m_ios, &ios_init);
+        APP_ERROR_CHECK(err_code);
+    }
+
+    /////////////////////////////
+    // Advertising初期化
+    {
+        ble_uuid_t adv_uuids[] = { { IOS_UUID_SERVICE, m_ios.uuid_type } };
+        ble_advdata_t advdata = {0};
+        ble_advdata_t scanrsp = {0};
+        uint8_t       flags = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
+
+        /*
+         * ble_advdata_name_type_t (ble_advdata.h)
+         *
+         * BLE_ADVDATA_NO_NAME    : デバイス名無し
+         * BLE_ADVDATA_SHORT_NAME : デバイス名あり «Shortened Local Name»
+         * BLE_ADVDATA_FULL_NAME  : デバイス名あり «Complete Local Name»
+         *
+         * https://www.bluetooth.org/en-us/specification/assigned-numbers/generic-access-profile
+         */
+        advdata.name_type          = BLE_ADVDATA_FULL_NAME;
+
+        /*
+         * Appearanceが含まれるかどうか
+         */
+#ifdef GAP_USE_APPEARANCE
+        advdata.include_appearance = true;
+#else   //GAP_USE_APPEARANCE
+        advdata.include_appearance = false;
+#endif  //GAP_USE_APPEARANCE
+        /*
+         * Advertisingフラグの設定
+         * CSS_v4 : Part A  1.3 FLAGS
+         * https://devzone.nordicsemi.com/documentation/nrf51/4.3.0/html/group___b_l_e___g_a_p___a_d_v___f_l_a_g_s.html
+         *
+         * BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE = BLE_GAP_ADV_FLAG_LE_LIMITED_DISC_MODE | BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED
+         *      BLE_GAP_ADV_FLAG_LE_LIMITED_DISC_MODE : LE Limited Discoverable Mode
+         *      BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED : BR/EDR not supported
+         */
+        advdata.flags.size         = sizeof(flags);
+        advdata.flags.p_data       = &flags;
+
+        /* SCAN_RSPデータ設定 */
+        scanrsp.uuids_complete.uuid_cnt = ARRAY_SIZE(adv_uuids);
+        scanrsp.uuids_complete.p_uuids  = adv_uuids;
+
+        err_code = ble_advdata_set(&advdata, &scanrsp);
+        APP_ERROR_CHECK(err_code);
+    }
+
+    /////////////////////////////
+    // Connection初期化
+    {
+        ble_conn_params_init_t cp_init = {0};
+
+        cp_init.p_conn_params                  = NULL;
+        cp_init.first_conn_params_update_delay = CONN_FIRST_PARAMS_UPDATE_DELAY;
+        cp_init.next_conn_params_update_delay  = CONN_NEXT_PARAMS_UPDATE_DELAY;
+        cp_init.max_conn_params_update_count   = CONN_MAX_PARAMS_UPDATE_COUNT;
+        cp_init.start_on_notify_cccd_handle    = BLE_GATT_HANDLE_INVALID;
+        cp_init.disconnect_on_fail             = false;
+        cp_init.evt_handler                    = conn_params_evt_handler;
+        cp_init.error_handler                  = conn_params_error_handler;
+
+        err_code = ble_conn_params_init(&cp_init);
+        APP_ERROR_CHECK(err_code);
+    }
 }
 

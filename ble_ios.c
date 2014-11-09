@@ -23,14 +23,15 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  */
-/**@file    ble_ios.c
+/**
+ * @file    ble_ios.c
  *
  * I/Oサービス
  */
 
-/**************************************************************************/
-/* include                                                                */
-/**************************************************************************/
+/**************************************************************************
+ * include
+ **************************************************************************/
 
 #include "ble_ios.h"
 #include <string.h>
@@ -39,9 +40,9 @@
 #include "app_util.h"
 
 
-/**************************************************************************/
-/* prototype                                                              */
-/**************************************************************************/
+/**************************************************************************
+ * prototype
+ **************************************************************************/
 
 static void on_connect(ble_ios_t *p_ios, ble_evt_t *p_ble_evt);
 static void on_disconnect(ble_ios_t *p_ios, ble_evt_t *p_ble_evt);
@@ -50,11 +51,12 @@ static uint32_t char_add_input(ble_ios_t *p_ios);
 static uint32_t char_add_output(ble_ios_t *p_ios);
 
 
-/**************************************************************************/
-/* public function                                                        */
-/**************************************************************************/
+/**************************************************************************
+ * public function
+ **************************************************************************/
 
-/**@brief サービス初期化
+/**
+ * @brief サービス初期化
  *
  * @param[in]   p_ios       サービス構造体
  * @param[in]   p_ios_init  サービス初期化構造体
@@ -99,7 +101,9 @@ uint32_t ble_ios_init(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init)
 }
 
 
-/**@brief BLEイベントハンドラ
+/**
+ * @brief BLEイベントハンドラ
+ *
  * アプリ層のBLEイベントハンドラから呼び出されることを想定している.
  *
  * @param[in]   p_ios       サービス構造体
@@ -127,7 +131,8 @@ void ble_ios_on_ble_evt(ble_ios_t *p_ios, ble_evt_t *p_ble_evt)
 }
 
 
-/**@brief 8bit値のNotify送信
+/**
+ * @brief 8bit値のNotify送信
  *
  * @param[in]   p_ios       サービス構造体
  * @param[in]   value       送信データ
@@ -149,11 +154,12 @@ uint32_t ble_ios_on_output(ble_ios_t *p_ios, uint8_t value)
 }
 
 
-/**************************************************************************/
-/* private function                                                       */
-/**************************************************************************/
+/**************************************************************************
+ * private function
+ **************************************************************************/
 
-/**@brief CONNECT時
+/**
+ * @brief CONNECT時
  *
  * @param[in]   p_ios       サービス構造体
  * @param[in]   p_ble_evt   イベント構造体
@@ -164,7 +170,8 @@ static void on_connect(ble_ios_t *p_ios, ble_evt_t *p_ble_evt)
 }
 
 
-/**@brief DISCONNECT時
+/**
+ * @brief DISCONNECT時
  *
  * @param[in]   p_ios       サービス構造体
  * @param[in]   p_ble_evt   イベント構造体
@@ -176,7 +183,8 @@ static void on_disconnect(ble_ios_t *p_ios, ble_evt_t *p_ble_evt)
 }
 
 
-/**@brief Write時
+/**
+ * @brief Write時
  *
  * @param[in]   p_ios       サービス構造体
  * @param[in]   p_ble_evt   イベント構造体
@@ -193,7 +201,8 @@ static void on_write(ble_ios_t *p_ios, ble_evt_t *p_ble_evt)
 }
 
 
-/**@brief キャラクタリスティック登録：Write(8bit)
+/**
+ * @brief キャラクタリスティック登録：Write(8bit)
  *
  * @param[in]   p_ios       サービス構造体
  */
@@ -260,7 +269,8 @@ static uint32_t char_add_input(ble_ios_t *p_ios)
 }
 
 
-/**@brief キャラクタリスティック登録：Read, Notify(8bit)
+/**
+ * @brief キャラクタリスティック登録：Read, Notify(8bit)
  *
  * @param[in]   p_ios       サービス構造体
  */
