@@ -28,25 +28,15 @@
  * include
  **************************************************************************/
 
-#include <stdint.h>
 #include <string.h>
-#include "nordic_common.h"
-#include "nrf.h"
-#include "app_error.h"
-#include "nrf_gpio.h"
-#include "nrf51_bitfields.h"
-#include "ble.h"
-#include "ble_hci.h"
-#include "ble_srv_common.h"
-#include "ble_advdata.h"
-#include "ble_conn_params.h"
-#include "app_scheduler.h"
-#include "softdevice_handler.h"
-#include "app_timer.h"
-#include "ble_error_log.h"
-#include "app_gpiote.h"
-#include "app_button.h"
-#include "ble_debug_assert_handler.h"
+
+#include "sd_common/softdevice_handler.h"
+#include "app_common/app_timer.h"
+#include "app_common/app_gpiote.h"
+#include "app_common/app_button.h"
+#include "ble/ble_advdata.h"
+#include "ble/ble_conn_params.h"
+#include "s110/ble_hci.h"
 
 #include "ble_ios.h"
 
@@ -245,7 +235,7 @@ __attribute__( ( always_inline ) ) __STATIC_INLINE void led_off(int pin);
 
 /* Timer */
 static void timers_init(void);
-static void timers_start(void);
+//static void timers_start(void);
 
 /* Scheduler */
 static void scheduler_init(void);
@@ -255,17 +245,10 @@ static void gpiote_init(void);
 static void buttons_init(void);
 static void button_event_handler(uint8_t pin_no, uint8_t button_event);
 
-static void gap_params_init(void);
-
-static void advertising_init(void);
 static void advertising_start(void);
 
-static void services_init(void);
 static void services_ios_handler_in(ble_ios_t *p_ios, uint8_t value);
 
-static void sec_params_init(void);
-
-static void conn_params_init(void);
 static void conn_params_evt_handler(ble_conn_params_evt_t * p_evt);
 static void conn_params_error_handler(uint32_t nrf_error);
 
@@ -460,7 +443,7 @@ static void timers_init(void)
 #endif
 }
 
-
+#if 0
 /**
  * @brief タイマ開始
  */
@@ -474,7 +457,7 @@ static void timers_start(void)
     APP_ERROR_CHECK(err_code);
 #endif
 }
-
+#endif
 
 /**********************************************
  * Scheduler
