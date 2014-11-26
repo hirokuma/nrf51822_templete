@@ -40,6 +40,11 @@
 
 #include "ble_ios.h"
 
+//from Makefile
+#ifdef USE_UART_LOG
+#include "simple_uart.h"
+#endif  /* USE_UART_LOG */
+
 
 /**************************************************************************
  * macro
@@ -74,6 +79,12 @@
 /** LED : アプリ用 */
 #define LED_PIN_NO_APP                  (16)
 
+#ifdef USE_UART_LOG
+#define UART_PIN_NO_RX                  (9)
+#define UART_PIN_NO_TX                  (8)
+#endif  /* USE_UART_LOG */
+
+
 /*
  * Timer
  */
@@ -93,7 +104,7 @@
 #define APP_GPIOTE_MAX_USERS            (1)
 
 /** Delay from a GPIOTE event until a button is reported as pushed (in number of timer ticks). */
-#define BUTTON_DETECTION_DELAY          APP_TIMER_TICKS(50, APP_TIMER_PRESCALER)
+#define BUTTON_DETECTION_DELAY          (50)
 
 /*
  * Scheduler
@@ -124,14 +135,12 @@
  * https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.appearance.xml
  * https://devzone.nordicsemi.com/documentation/nrf51/4.3.0/html/group___b_l_e___a_p_p_e_a_r_a_n_c_e_s.html
  */
-//#define GAP_USE_APPEARANCE              BLE_APPEARANCE_UNKNOWN
-
 
 /*
  * BLE : Advertising
  */
-/* Advertising間隔[0.625msec単位] */
-#define APP_ADV_INTERVAL                (64)
+/* Advertising間隔[msec単位] */
+#define APP_ADV_INTERVAL                (100)
 
 /* Advertisingタイムアウト時間[sec単位] */
 #define APP_ADV_TIMEOUT_IN_SECONDS      (180)
@@ -142,19 +151,20 @@
  *
  * connInterval : Connectionイベントの送信間隔(7.5msec～4sec)
  * connSlaveLatency : SlaveがConnectionイベントを連続して無視できる回数
- * connSupervisionTimeout :
+ * connSupervisionTimeout : Connection時に相手がいなくなったとみなす時間(100msec～32sec)
+ *                          (1 + connSlaveLatency) * connInterval * 2以上
  */
 /* 最小時間[msec単位] */
-#define CONN_MIN_INTERVAL               MSEC_TO_UNITS(500, UNIT_1_25_MS)
+#define CONN_MIN_INTERVAL               (500)
 
 /* 最大時間[msec単位] */
-#define CONN_MAX_INTERVAL               MSEC_TO_UNITS(1000, UNIT_1_25_MS)
+#define CONN_MAX_INTERVAL               (1000)
 
 /* slave latency */
 #define CONN_SLAVE_LATENCY              (0)
 
 /* connSupervisionTimeout[msec単位] */
-#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)
+#define CONN_SUP_TIMEOUT                (4000)
 
 /** sd_ble_gap_conn_param_update()を実行してから初回の接続イベントを通知するまでの時間[msec単位] */
 /*
@@ -171,10 +181,10 @@
  * note:
  *      connSupervisionTimeout * 8 >= connIntervalMax * (connSlaveLatency + 1)
  */
-#define CONN_FIRST_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000, APP_TIMER_PRESCALER)
+#define CONN_FIRST_PARAMS_UPDATE_DELAY  (5000)
 
 /** sd_ble_gap_conn_param_update()を呼び出す間隔[msec単位] */
-#define CONN_NEXT_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000, APP_TIMER_PRESCALER)
+#define CONN_NEXT_PARAMS_UPDATE_DELAY   (30000)
 
 /** Number of attempts before giving up the connection parameter negotiation. */
 #define CONN_MAX_PARAMS_UPDATE_COUNT    (3)
@@ -209,6 +219,60 @@
 /** 符号化鍵サイズ:最大byte(min～16) */
 #define SEC_PARAM_MAX_KEY_SIZE          (16)
 
+
+/*
+ * UARTデバッグログ出力
+ *   使用する場合は、MakefileでUSE_UART_LOGを有効にすること。
+ */
+#ifdef USE_UART_LOG
+#define DBG_OUT(str)    simple_uart_putstring((const uint8_t *)str)
+#else
+#define DBG_OUT(str)    /* nothing */
+#endif  /* USE_UART_LOG */
+
+
+//設定値のチェック
+#if (APP_ADV_INTERVAL < 20)
+#error connInterval(Advertising) too small.
+#elif (APP_ADV_INTERVAL < 100)
+#warning connInterval(Advertisin) is too small in non-connectable mode
+#elif (10240 < APP_ADV_INTERVAL)
+#error connInterval(Advertising) too large.
+#endif  //APP_ADV_INTERVAL
+
+#if (BLE_GAP_ADV_TIMEOUT_LIMITED_MAX < APP_ADV_TIMEOUT_IN_SECONDS)
+#warning Advertising Timeout is too large in limited discoverable mode
+#endif  //APP_ADV_TIMEOUT_IN_SECONDS
+
+#if (CONN_MIN_INTERVAL * 1000 < 7500)
+#error connInterval_Min(Connection) too small.
+#elif (4000 < CONN_MIN_INTERVAL)
+#error connInterval_Min(Connection) too large.
+#endif  //CONN_MIN_INTERVAL
+
+#if (CONN_MAX_INTERVAL * 1000 < 7500)
+#error connInterval_Max(Connection) too small.
+#elif (4000 < CONN_MAX_INTERVAL)
+#error connInterval_Max(Connection) too large.
+#endif  //CONN_MAX_INTERVAL
+
+#if (CONN_MAX_INTERVAL < CONN_MIN_INTERVAL)
+#error connInterval_Max < connInterval_Min
+#endif  //connInterval Max < Min
+
+#if (BLE_GAP_CP_SLAVE_LATENCY_MAX < CONN_SLAVE_LATENCY)
+#error connSlaveLatency too large.
+#endif  //CONN_SLAVE_LATENCY
+
+#if (CONN_SUP_TIMEOUT < 100)
+#error connSupervisionTimeout too small.
+#elif (32000 < CONN_SUP_TIMEOUT)
+#error connSupervisionTimeout too large.
+#endif  //CONN_SUP_TIMEOUT
+
+#if (CONN_SUP_TIMEOUT * 8 < CONN_MAX_INTERVAL * (CONN_SLAVE_LATENCY + 1))
+#error connSupervisionTimeout too small in manner.
+#endif  //
 
 
 /**************************************************************************
@@ -272,6 +336,14 @@ int main(void)
     gpiote_init();
     buttons_init();
     scheduler_init();
+
+#ifdef USE_UART_LOG
+    /*
+     * Baud: 38400, data bits: 8 , Stop Bits: 1
+     * HW flow制御 : なし
+     */
+    simple_uart_config(0, UART_PIN_NO_TX, 0, UART_PIN_NO_TX, false);
+#endif  /* USE_UART_LOG */
 
     ble_stack_init();
 
@@ -502,7 +574,8 @@ static void buttons_init(void)
         { BUTTON_PIN_NO_APP, APP_BUTTON_ACTIVE_HIGH, NRF_GPIO_PIN_PULLDOWN, button_event_handler },
     };
 
-    APP_BUTTON_INIT(buttons, ARRAY_SIZE(buttons), BUTTON_DETECTION_DELAY, true);
+    APP_BUTTON_INIT(buttons, ARRAY_SIZE(buttons),
+                APP_TIMER_TICKS(BUTTON_DETECTION_DELAY, APP_TIMER_PRESCALER), true);
 }
 
 
@@ -565,12 +638,14 @@ static void advertising_start(void)
     adv_params.type        = BLE_GAP_ADV_TYPE_ADV_IND;
     adv_params.p_peer_addr = NULL;
     adv_params.fp          = BLE_GAP_ADV_FP_ANY;
-    adv_params.interval    = APP_ADV_INTERVAL;
+    adv_params.interval    = MSEC_TO_UNITS(APP_ADV_INTERVAL, UNIT_0_625_MS);
     adv_params.timeout     = APP_ADV_TIMEOUT_IN_SECONDS;
 
     err_code = sd_ble_gap_adv_start(&adv_params);
     APP_ERROR_CHECK(err_code);
     led_on(LED_PIN_NO_ADVERTISING);
+
+    DBG_OUT("advertising start\r\n");
 }
 
 
@@ -655,6 +730,7 @@ static void ble_evt_handler(ble_evt_t *p_ble_evt)
 
     //接続が成立したとき
     case BLE_GAP_EVT_CONNECTED:
+        DBG_OUT("BLE_GAP_EVT_CONNECTED\r\n");
         led_on(LED_PIN_NO_CONNECTED);
         led_off(LED_PIN_NO_ADVERTISING);
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
@@ -668,6 +744,7 @@ static void ble_evt_handler(ble_evt_t *p_ble_evt)
     //必要があればsd_ble_gatts_sys_attr_get()でSystem Attributeを取得し、保持しておく。
     //保持したSystem Attributeは、EVT_SYS_ATTR_MISSINGで返すことになる。
     case BLE_GAP_EVT_DISCONNECTED:
+        DBG_OUT("BLE_GAP_EVT_DISCONNECTED\r\n");
         led_off(LED_PIN_NO_CONNECTED);
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
 
@@ -681,6 +758,7 @@ static void ble_evt_handler(ble_evt_t *p_ble_evt)
     //SMP Paring要求を受信したとき
     //sd_ble_gap_sec_params_reply()で値を返したあと、SMP Paring Phase 2に状態遷移する
     case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
+        DBG_OUT("BLE_GAP_EVT_SEC_PARAMS_REQUEST\r\n");
         {
             ble_gap_sec_params_t sec_param;
             sec_param.timeout      = SEC_PARAM_TIMEOUT;
@@ -700,11 +778,13 @@ static void ble_evt_handler(ble_evt_t *p_ble_evt)
     //Just Works(Bonding有り)の場合、SMP Paring Phase 3のあとでPeripheral Keyが渡される。
     //ここではPeripheral Keyを保存だけしておき、次のBLE_GAP_EVT_SEC_INFO_REQUESTで処理する。
     case BLE_GAP_EVT_AUTH_STATUS:
+        DBG_OUT("BLE_GAP_EVT_AUTH_STATUS\r\n");
         m_auth_status = p_ble_evt->evt.gap_evt.params.auth_status;
         break;
 
     //SMP Paringが終わったとき？
     case BLE_GAP_EVT_SEC_INFO_REQUEST:
+        DBG_OUT("BLE_GAP_EVT_SEC_INFO_REQUEST\r\n");
         p_enc_info = &m_auth_status.periph_keys.enc_info;
         if (p_enc_info->div == p_ble_evt->evt.gap_evt.params.sec_info_request.div) {
             //Peripheral Keyが有る
@@ -719,6 +799,7 @@ static void ble_evt_handler(ble_evt_t *p_ble_evt)
 
     //Advertisingか認証のタイムアウト発生
     case BLE_GAP_EVT_TIMEOUT:
+        DBG_OUT("BLE_GAP_EVT_TIMEOUT\r\n");
         switch (p_ble_evt->evt.gap_evt.params.timeout.src) {
         case BLE_GAP_TIMEOUT_SRC_ADVERTISEMENT: //Advertisingのタイムアウト
             /* Advertising LEDを消灯 */
@@ -744,6 +825,7 @@ static void ble_evt_handler(ble_evt_t *p_ble_evt)
     //接続後、Bondingした相手からSystem Attribute要求を受信したとき
     //System Attributeは、EVT_DISCONNECTEDで保持するが、今回は保持しないのでNULLを返す。
     case BLE_GATTS_EVT_SYS_ATTR_MISSING:
+        DBG_OUT("BLE_GATTS_EVT_SYS_ATTR_MISSING\r\n");
         err_code = sd_ble_gatts_sys_attr_set(m_conn_handle, NULL, 0);
         APP_ERROR_CHECK(err_code);
         break;
@@ -840,10 +922,10 @@ static void ble_stack_init(void)
     {
         ble_gap_conn_params_t   gap_conn_params = {0};
 
-        gap_conn_params.min_conn_interval = CONN_MIN_INTERVAL;
-        gap_conn_params.max_conn_interval = CONN_MAX_INTERVAL;
+        gap_conn_params.min_conn_interval = MSEC_TO_UNITS(CONN_MIN_INTERVAL, UNIT_1_25_MS);
+        gap_conn_params.max_conn_interval = MSEC_TO_UNITS(CONN_MAX_INTERVAL, UNIT_1_25_MS);
         gap_conn_params.slave_latency     = CONN_SLAVE_LATENCY;
-        gap_conn_params.conn_sup_timeout  = CONN_SUP_TIMEOUT;
+        gap_conn_params.conn_sup_timeout  = MSEC_TO_UNITS(CONN_SUP_TIMEOUT, UNIT_10_MS);
 
         err_code = sd_ble_gap_ppcp_set(&gap_conn_params);
         APP_ERROR_CHECK(err_code);
@@ -912,8 +994,8 @@ static void ble_stack_init(void)
         ble_conn_params_init_t cp_init = {0};
 
         cp_init.p_conn_params                  = NULL;
-        cp_init.first_conn_params_update_delay = CONN_FIRST_PARAMS_UPDATE_DELAY;
-        cp_init.next_conn_params_update_delay  = CONN_NEXT_PARAMS_UPDATE_DELAY;
+        cp_init.first_conn_params_update_delay = APP_TIMER_TICKS(CONN_FIRST_PARAMS_UPDATE_DELAY, APP_TIMER_PRESCALER);
+        cp_init.next_conn_params_update_delay  = APP_TIMER_TICKS(CONN_NEXT_PARAMS_UPDATE_DELAY, APP_TIMER_PRESCALER);
         cp_init.max_conn_params_update_count   = CONN_MAX_PARAMS_UPDATE_COUNT;
         cp_init.start_on_notify_cccd_handle    = BLE_GATT_HANDLE_INVALID;
         cp_init.disconnect_on_fail             = false;
