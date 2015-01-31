@@ -27,7 +27,7 @@
 /**
  * @file    ble_ios.h
  *
- * I/Oサービス(8bit)
+ * Input/Outputサービス
  */
 #ifndef BLE_IOS_H__
 #define BLE_IOS_H__
@@ -63,26 +63,30 @@ typedef struct ble_ios_s ble_ios_t;
  * @brief サービスイベントハンドラ
  *
  * @param[in]   p_ios   I/Oサービス構造体
- * @param[in]   value   受信した値
+ * @param[in]   p_value 受信バッファ
+ * @param[in]   length  受信データ長
  */
-typedef void (*ble_ios_evt_handler_t) (ble_ios_t *p_ios, uint8_t value);
+typedef void (*ble_ios_evt_handler_t) (ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length);
 
 
 /**@brief サービス初期化構造体 */
 typedef struct {
-    ble_ios_evt_handler_t           evt_handler_in;             /**< Event handler to be called for handling events in the I/O Service. */
+    ble_ios_evt_handler_t           evt_handler_in;             /**< イベントハンドラ : Input Notify発生 */
+    uint16_t                        len_in;                     /**< Inputデータ長 */
+    uint16_t                        len_out;                    /**< Outputデータ長 */
 } ble_ios_init_t;
 
 
 /**@brief サービス構造体 */
 typedef struct ble_ios_s {
     uint16_t                        service_handle;             /**< Handle of I/O Service (as provided by the BLE stack). */
-    ble_gatts_char_handles_t        char_handle_in;             /**< Handles related to the Input characteristic. */
-    ble_gatts_char_handles_t        char_handle_out;            /**< Handles related to the Output characteristic. */
     uint16_t                        conn_handle;                /**< Handle of the current connection (as provided by the BLE stack, is BLE_CONN_HANDLE_INVALID if not in a connection). */
     uint8_t                         uuid_type;
     //
+    ble_gatts_char_handles_t        char_handle_in;             /**< Handles related to the Input characteristic. */
     ble_ios_evt_handler_t           evt_handler_in;             /**< Event handler to be called for handling events in the I/O Service. */
+    //
+    ble_gatts_char_handles_t        char_handle_out;            /**< Handles related to the Output characteristic. */
 } ble_ios_t;
 
 
@@ -108,13 +112,14 @@ uint32_t ble_ios_init(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init);
 void ble_ios_on_ble_evt(ble_ios_t *p_ios, ble_evt_t *p_ble_evt);
 
 
-/**@brief 8bit値のNotify送信
+/**@brief Notify送信
  *
  * @param[in]   p_ios       サービス構造体
- * @param[in]   value       送信データ
+ * @param[in]   p_value     送信データバッファ
+ * @param[in]   length      送信データサイズ
  * @retval      NRF_SUCCESS 成功
  */
-uint32_t ble_ios_on_output(ble_ios_t *p_ios, uint8_t value);
+uint32_t ble_ios_on_output(ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length);
 
 #endif // BLE_IOS_H__
 

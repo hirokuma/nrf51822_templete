@@ -30,13 +30,14 @@
 
 #include <string.h>
 
-#include "sd_common/softdevice_handler.h"
-#include "app_common/app_timer.h"
-#include "app_common/app_gpiote.h"
-#include "app_common/app_button.h"
-#include "ble/ble_advdata.h"
-#include "ble/ble_conn_params.h"
-#include "s110/ble_hci.h"
+#include "softdevice_handler.h"
+#include "app_timer.h"
+#include "app_gpiote.h"
+#include "app_button.h"
+#include "ble_advdata.h"
+#include "ble_conn_params.h"
+#include "ble_gap.h"
+#include "ble_hci.h"
 
 #include "ble_ios.h"
 
@@ -124,7 +125,7 @@
  * デバイス名
  *   UTF-8かつ、\0を含まずに20文字以内(20byte?)
  */
-#define GAP_DEVICE_NAME                 "hiro99ma_Template"
+#define GAP_DEVICE_NAME                 "mosimosi"
 
 /*
  * Appearance設定
@@ -153,6 +154,9 @@
  * connSlaveLatency : SlaveがConnectionイベントを連続して無視できる回数
  * connSupervisionTimeout : Connection時に相手がいなくなったとみなす時間(100msec～32sec)
  *                          (1 + connSlaveLatency) * connInterval * 2以上
+ *
+ * note:
+ *      connSupervisionTimeout * 8 >= connIntervalMax * (connSlaveLatency + 1)
  */
 /* 最小時間[msec単位] */
 #define CONN_MIN_INTERVAL               (500)
@@ -177,16 +181,13 @@
  *      接続パラメータとしてNULLが指定でき、そのときはPPCPキャラクタリスティックが使われる。
  *      ということは、Peripheralだったらsd_ble_gap_conn_param_update()は呼ばずに
  *      sd_ble_gap_ppcp_set()を呼ぶということでもよいということか？
- *
- * note:
- *      connSupervisionTimeout * 8 >= connIntervalMax * (connSlaveLatency + 1)
  */
 #define CONN_FIRST_PARAMS_UPDATE_DELAY  (5000)
 
 /** sd_ble_gap_conn_param_update()を呼び出す間隔[msec単位] */
 #define CONN_NEXT_PARAMS_UPDATE_DELAY   (30000)
 
-/** Number of attempts before giving up the connection parameter negotiation. */
+/** Connectionパラメータ交換を諦めるまでの試行回数 */
 #define CONN_MAX_PARAMS_UPDATE_COUNT    (3)
 
 /*
@@ -196,7 +197,7 @@
 #define SEC_PARAM_TIMEOUT               (30)
 
 /** 1:Bondingあり 0:なし */
-#define SEC_PARAM_BOND                  (1)
+#define SEC_PARAM_BOND                  (0)
 
 /** 1:ペアリング時の認証あり 0:なし */
 #define SEC_PARAM_MITM                  (0)
@@ -210,7 +211,7 @@
  */
 #define SEC_PARAM_IO_CAPABILITIES       BLE_GAP_IO_CAPS_NONE
 
-/** 1:OOB認証有り/0:なし */
+/** 1:OOB認証有り 0:なし */
 #define SEC_PARAM_OOB                   (0)
 
 /** 符号化鍵サイズ:最小byte(7～) */
@@ -240,7 +241,9 @@
 #error connInterval(Advertising) too large.
 #endif  //APP_ADV_INTERVAL
 
-#if (BLE_GAP_ADV_TIMEOUT_LIMITED_MAX < APP_ADV_TIMEOUT_IN_SECONDS)
+#if (APP_ADV_TIMEOUT_IN_SECONDS == BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED)
+//OK
+#elif (BLE_GAP_ADV_TIMEOUT_LIMITED_MAX < APP_ADV_TIMEOUT_IN_SECONDS)
 #warning Advertising Timeout is too large in limited discoverable mode
 #endif  //APP_ADV_TIMEOUT_IN_SECONDS
 
@@ -311,7 +314,7 @@ static void button_event_handler(uint8_t pin_no, uint8_t button_event);
 
 static void advertising_start(void);
 
-static void services_ios_handler_in(ble_ios_t *p_ios, uint8_t value);
+static void services_ios_handler_in(ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length);
 
 static void conn_params_evt_handler(ble_conn_params_evt_t * p_evt);
 static void conn_params_error_handler(uint32_t nrf_error);
@@ -587,8 +590,16 @@ static void buttons_init(void)
  */
 static void button_event_handler(uint8_t pin_no, uint8_t button_event)
 {
-    uint32_t err_code = NRF_SUCCESS;
-    uint8_t value;
+    uint32_t err_code;
+    static uint8_t value[256];
+    static uint8_t inc = 0;
+
+    //目印
+    int loop;
+    for (loop=0; loop<sizeof(value); loop++) {
+        value[loop] = inc++;
+    }
+    inc++;
 
     /*
      * APPボタンを押下すると0x80を、離すと0x00を送信する。
@@ -597,14 +608,14 @@ static void button_event_handler(uint8_t pin_no, uint8_t button_event)
     case BUTTON_PIN_NO_APP:
         if (button_event == APP_BUTTON_PUSH) {
             //push
-            value = 0x80;
+            value[0] = 0x80;
         }
         else {
             //release
-            value = 0x00;
+            value[0] = 0x00;
         }
         //Notify送信
-        err_code = ble_ios_on_output(&m_ios, value);
+        err_code = ble_ios_on_output(&m_ios, value, (uint16_t)sizeof(value));
         if ((err_code != NRF_SUCCESS) &&
           (err_code != BLE_ERROR_INVALID_CONN_HANDLE) &&
           (err_code != NRF_ERROR_INVALID_STATE)) {
@@ -657,11 +668,12 @@ static void advertising_start(void)
  * @brief I/Oサービスイベントハンドラ
  *
  * @param[in]   p_ios   I/Oサービス構造体
- * @param[in]   value   受信した値
+ * @param[in]   p_value 受信バッファ
+ * @param[in]   length  受信データ長
  */
-static void services_ios_handler_in(ble_ios_t *p_ios, uint8_t value)
+static void services_ios_handler_in(ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length)
 {
-    if (value == 0x80) {
+    if (p_value[0] == 0x80) {
         //
         led_on(LED_PIN_NO_APP);
     }
@@ -933,10 +945,14 @@ static void ble_stack_init(void)
 
     /////////////////////////////
     // Service初期化
+    //      入力:256byteまで
+    //      出力:256byteまで
     {
         ble_ios_init_t ios_init;
 
         ios_init.evt_handler_in = services_ios_handler_in;
+        ios_init.len_in = 256;
+        ios_init.len_out = 256;
         err_code = ble_ios_init(&m_ios, &ios_init);
         APP_ERROR_CHECK(err_code);
     }
@@ -958,7 +974,7 @@ static void ble_stack_init(void)
          *
          * https://www.bluetooth.org/en-us/specification/assigned-numbers/generic-access-profile
          */
-        advdata.name_type          = BLE_ADVDATA_FULL_NAME;
+        advdata.name_type = BLE_ADVDATA_FULL_NAME;
 
         /*
          * Appearanceが含まれるかどうか
@@ -977,8 +993,8 @@ static void ble_stack_init(void)
          *      BLE_GAP_ADV_FLAG_LE_LIMITED_DISC_MODE : LE Limited Discoverable Mode
          *      BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED : BR/EDR not supported
          */
-        advdata.flags.size         = sizeof(flags);
-        advdata.flags.p_data       = &flags;
+        advdata.flags.size   = sizeof(flags);
+        advdata.flags.p_data = &flags;
 
         /* SCAN_RSPデータ設定 */
         scanrsp.uuids_complete.uuid_cnt = ARRAY_SIZE(adv_uuids);

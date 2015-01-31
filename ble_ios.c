@@ -46,8 +46,8 @@
 static void on_connect(ble_ios_t *p_ios, ble_evt_t *p_ble_evt);
 static void on_disconnect(ble_ios_t *p_ios, ble_evt_t *p_ble_evt);
 static void on_write(ble_ios_t *p_ios, ble_evt_t *p_ble_evt);
-static uint32_t char_add_input(ble_ios_t *p_ios);
-static uint32_t char_add_output(ble_ios_t *p_ios);
+static uint32_t char_add_input(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init);
+static uint32_t char_add_output(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init);
 
 
 /**************************************************************************
@@ -87,11 +87,11 @@ uint32_t ble_ios_init(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init)
     }
 
     //キャラクタリスティック登録
-    err_code = char_add_input(p_ios);
+    err_code = char_add_input(p_ios, p_ios_init);
     if (err_code != NRF_SUCCESS) {
         return err_code;
     }
-    err_code = char_add_output(p_ios);
+    err_code = char_add_output(p_ios, p_ios_init);
     if (err_code != NRF_SUCCESS) {
         return err_code;
     }
@@ -131,23 +131,30 @@ void ble_ios_on_ble_evt(ble_ios_t *p_ios, ble_evt_t *p_ble_evt)
 
 
 /**
- * @brief 8bit値のNotify送信
+ * @brief Notify送信
+ *
+ * BLEの仕様上、ATT_MTU-3(20byte)までしか送信できない。
+ * それ以上やりとりしたい場合は、Client側にRead Blob Requestしてもらうこと。
  *
  * @param[in]   p_ios       サービス構造体
- * @param[in]   value       送信データ
+ * @param[in]   p_value     送信データバッファ
+ * @param[in]   length      送信データサイズ
  * @retval      NRF_SUCCESS 成功
  */
-uint32_t ble_ios_on_output(ble_ios_t *p_ios, uint8_t value)
+uint32_t ble_ios_on_output(ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length)
 {
-    //Notify
     ble_gatts_hvx_params_t params;
-    uint16_t len = sizeof(value);
 
     memset(&params, 0, sizeof(params));
-    params.type = BLE_GATT_HVX_NOTIFICATION;
     params.handle = p_ios->char_handle_out.value_handle;
-    params.p_data = &value;
-    params.p_len = &len;
+    params.type = BLE_GATT_HVX_NOTIFICATION;    //Notification
+//    params.offset = 0;
+    if (length > (uint16_t)(GATT_RX_MTU - 3)) {
+        //Vol.3 Part F 3.4.7.1 Handle Value Notificationでの仕様
+        length = GATT_RX_MTU - 3;
+    }
+    params.p_len = &length;
+    params.p_data = (uint8_t *)p_value;     //constはずしは嫌だが
 
     return sd_ble_gatts_hvx(p_ios->conn_handle, &params);
 }
@@ -193,30 +200,34 @@ static void on_write(ble_ios_t *p_ios, ble_evt_t *p_ble_evt)
     ble_gatts_evt_write_t *p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
 
     if ((p_evt_write->handle == p_ios->char_handle_in.value_handle) &&
-      (p_evt_write->len == 1) &&
       (p_ios->evt_handler_in != NULL)) {
-        p_ios->evt_handler_in(p_ios, p_evt_write->data[0]);
+        p_ios->evt_handler_in(p_ios, p_evt_write->data, p_evt_write->len);
     }
 }
 
 
 /**
- * @brief キャラクタリスティック登録：Write(8bit)
+ * @brief キャラクタリスティック登録：Input
  *
- * @param[in]   p_ios       サービス構造体
+ *      permission : Write
+ *
+ * @param[in/out]   p_ios       サービス構造体
+ * @param[in]       p_ios_init  サービス初期化構造体
  */
-static uint32_t char_add_input(ble_ios_t *p_ios)
+static uint32_t char_add_input(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init)
 {
     ble_gatts_char_md_t char_md;
-    ble_gatts_attr_t    attr_char_value;
-    ble_uuid_t          ble_uuid;
+    ble_uuid_t          char_uuid;
     ble_gatts_attr_md_t attr_md;
+    ble_gatts_attr_t    attr_char_value;
 
     ///////////////////////
-    // キャラクタリスティックメタデータの設定
+    //Characteristicの設定
+    ///////////////////////
 
+    // メタデータ
+    //      Write
     memset(&char_md, 0, sizeof(char_md));
-
     char_md.char_props.write  = 1;
 //    char_md.p_char_user_desc  = NULL;
 //    char_md.p_char_pf         = NULL;
@@ -224,79 +235,73 @@ static uint32_t char_add_input(ble_ios_t *p_ios)
 //    char_md.p_cccd_md         = NULL;
 //    char_md.p_sccd_md         = NULL;
 
-
-    ///////////////////////
-    // UUIDの設定
-
-    ble_uuid.type = p_ios->uuid_type;
-    ble_uuid.uuid = IOS_UUID_CHAR_INPUT;
+    // UUID
+    char_uuid.type = p_ios->uuid_type;
+    char_uuid.uuid = IOS_UUID_CHAR_INPUT;
 
 
     ///////////////////////
     // Attributeの設定
+    ///////////////////////
 
-    memset(&attr_md, 0, sizeof(attr_md));
-
+    // メタデータ
     //Write Only
+    memset(&attr_md, 0, sizeof(attr_md));
     BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&attr_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.write_perm);
+//    attr_md.vlen       = 0;
     attr_md.vloc       = BLE_GATTS_VLOC_STACK;
 //    attr_md.rd_auth    = 0;
 //    attr_md.wr_auth    = 0;
-//    attr_md.vlen       = 0;
 
-
-    ///////////////////////
-    // Attributeの設定
-
+    // value
     memset(&attr_char_value, 0, sizeof(attr_char_value));
-
-    attr_char_value.p_uuid       = &ble_uuid;
+    attr_char_value.p_uuid       = &char_uuid;
     attr_char_value.p_attr_md    = &attr_md;
-    attr_char_value.init_len     = sizeof(uint8_t);
-    attr_char_value.init_offs    = 0;
-    attr_char_value.max_len      = sizeof(uint8_t);
-    attr_char_value.p_value      = NULL;
+    attr_char_value.init_len     = 1;
+//    attr_char_value.init_offs    = 0;
+    attr_char_value.max_len      = p_ios_init->len_in;
+//    attr_char_value.p_value      = NULL;
 
 
     ///////////////////////
     // キャラクタリスティックの登録
-
-    return sd_ble_gatts_characteristic_add(p_ios->service_handle, &char_md,
-                                               &attr_char_value,
-                                               &p_ios->char_handle_in);
+    return sd_ble_gatts_characteristic_add(p_ios->service_handle,
+                                                &char_md,
+                                                &attr_char_value,
+                                                &p_ios->char_handle_in);
 }
 
 
 /**
- * @brief キャラクタリスティック登録：Read, Notify(8bit)
+ * @brief キャラクタリスティック登録：Output
  *
- * @param[in]   p_ios       サービス構造体
+ *      permission : Read, Notify
+ *
+ * @param[in/out]   p_ios       サービス構造体
+ * @param[in]       p_ios_init  サービス初期化構造体
  */
-static uint32_t char_add_output(ble_ios_t *p_ios)
+static uint32_t char_add_output(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init)
 {
     ble_gatts_char_md_t char_md;
     ble_gatts_attr_md_t cccd_md;
-    ble_gatts_attr_t    attr_char_value;
-    ble_uuid_t          ble_uuid;
+    ble_uuid_t          char_uuid;
     ble_gatts_attr_md_t attr_md;
+    ble_gatts_attr_t    attr_char_value;
 
     ///////////////////////
-    // CCCDの設定(Notify/Indicate用)
+    // Characteristicの設定
+    ///////////////////////
 
+    // CCCD(Notify/Indicate用)
     memset(&cccd_md, 0, sizeof(cccd_md));
-
-    //require no protection, open link.
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.write_perm);
     cccd_md.vloc = BLE_GATTS_VLOC_STACK;
 
-
-    ///////////////////////
-    // キャラクタリスティックメタデータの設定
-
+    // メタデータ
+    //      Read, Notify
     memset(&char_md, 0, sizeof(char_md));
-
     char_md.char_props.read   = 1;
     char_md.char_props.notify = 1;
 //    char_md.p_char_user_desc  = NULL;
@@ -305,45 +310,39 @@ static uint32_t char_add_output(ble_ios_t *p_ios)
     char_md.p_cccd_md         = &cccd_md;
 //    char_md.p_sccd_md         = NULL;
 
-
-    ///////////////////////
-    // UUIDの設定
-
-    ble_uuid.type = p_ios->uuid_type;
-    ble_uuid.uuid = IOS_UUID_CHAR_OUTPUT;
+    // UUID
+    char_uuid.type = p_ios->uuid_type;
+    char_uuid.uuid = IOS_UUID_CHAR_OUTPUT;
 
 
     ///////////////////////
     // Attributeの設定
+    ///////////////////////
 
-    memset(&attr_md, 0, sizeof(attr_md));
-
+    // メタデータ
     //Read Only
+    memset(&attr_md, 0, sizeof(attr_md));
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&attr_md.write_perm);
-    attr_md.vloc       = BLE_GATTS_VLOC_STACK;
-//    attr_md.rd_auth    = 0;
-//    attr_md.wr_auth    = 0;
 //    attr_md.vlen       = 0;
+    attr_md.vloc       = BLE_GATTS_VLOC_STACK;
+//    attr_md.rd_auth    = 0;       //0:without response
+//    attr_md.wr_auth    = 0;       //0:without response
 
-
-    ///////////////////////
-    // Attributeの設定
-
+    // value
     memset(&attr_char_value, 0, sizeof(attr_char_value));
-
-    attr_char_value.p_uuid       = &ble_uuid;
+    attr_char_value.p_uuid       = &char_uuid;
     attr_char_value.p_attr_md    = &attr_md;
-    attr_char_value.init_len     = sizeof(uint8_t);
-    attr_char_value.init_offs    = 0;
-    attr_char_value.max_len      = sizeof(uint8_t);
-    attr_char_value.p_value      = NULL;
+    attr_char_value.init_len     = 1;
+//    attr_char_value.init_offs    = 0;
+    attr_char_value.max_len      = p_ios_init->len_out;
+//    attr_char_value.p_value      = NULL;
 
 
     ///////////////////////
     // キャラクタリスティックの登録
-
-    return sd_ble_gatts_characteristic_add(p_ios->service_handle, &char_md,
-                                               &attr_char_value,
-                                               &p_ios->char_handle_out);
+    return sd_ble_gatts_characteristic_add(p_ios->service_handle,
+                                                &char_md,
+                                                &attr_char_value,
+                                                &p_ios->char_handle_out);
 }
